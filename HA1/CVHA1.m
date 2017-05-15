@@ -11,8 +11,8 @@
 
 
 %% Bild laden
-%  Image = imread('szene.jpg');
-%  IGray = rgb_to_gray(Image);
+Image = imread('szene.jpg');
+IGray = rgb_to_gray(Image);
 
 
 
