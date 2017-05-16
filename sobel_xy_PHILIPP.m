@@ -4,13 +4,14 @@ function [Fx,Fy] = sobel_xy(Image)
 % y-Richtung zur?ckgibt.
 
 % sobel operator
-sobel_op = [1, 0, -1; 
-            2, 0, -2; 
+sobel_op = [1, 0, -1;
+            2, 0, -2;
             1, 0, -1 ];
 
 % 2D concolution
-Fx = conv2(double(Image), sobel_op, 'valid');
-Fy = conv2(double(Image), sobel_op.', 'valid');
+Fx = conv2(double(Image), sobel_op, 'same');
+Fy = conv2(double(Image), sobel_op.', 'same');
+
 
 end
 
