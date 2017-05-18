@@ -13,8 +13,8 @@ k = [1 2 1; 0 0 0; -1 -2 -1];
 
 % take valid flag cause output is only Fx,Fy and not a matrix
 % valid doesnt let edges fade away like full flag
-Fx = conv2(double(Image),k', 'valid');
-Fy = conv2(double(Image),k, 'valid');
+Fx = conv2(double(Image),k', 'same');
+Fy = conv2(double(Image),k, 'same');
 
 end
 
