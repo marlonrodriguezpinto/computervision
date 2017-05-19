@@ -18,4 +18,8 @@ IGray = rgb_to_gray(Image);
 %% Harris-Merkmale berechnen
 tic;
 Merkmale = harris_detektor(IGray,'do_plot',true);
+
+% Anzahl der gefundenen Merkmale
+fprintf('Anzahl der gefundenen Merkmale: %i\n', size(Merkmale,1));
+
 toc;
