@@ -11,7 +11,7 @@ end
 %% PARAMETERS
 do_plot = false;
 segment_length = 3;
-k = 0.05;
+k = 0.04;
 tau = 10^8;
 tile_size = 20;
 min_dist = 5;
@@ -48,28 +48,24 @@ end
 %%
 % computing image gradient in x- and y-direction
 [Fx, Fy] = sobel_xy(Image);
-    %----ONLY DEBUG----ONLY DEBUG----ONLY DEBUG----ONLY DEBUG----ONLY DEBUG----ONLY DEBUG----
-    imshow(uint8(sqrt(Fx.^2 + Fy.^2)))
-    %----------------------------------------------------------------------------------------
 
-% gaussian filter
-gauss_filter = fspecial('gaussian', segment_length, 1);
+% gaussian filter used for weights in harris matrix 
+gauss_filter = 2*fspecial('gaussian', segment_length, 1);
 
 % consider weights for harris matrix
+Fxy = conv2(Fx.*Fy, gauss_filter, 'same');
 Fx = conv2(Fx.^2, gauss_filter, 'same');
 Fy = conv2(Fy.^2, gauss_filter, 'same');
-Fxy = conv2(Fx.*Fy, gauss_filter, 'same');
 
-% criterion for harris feature
-H = Fx.^2.*Fy.^2 - Fxy.^2 - k*(Fx + Fy).^2;
+% criterion for harris feature ( det() - k*tr()^2 )
+H = Fx.*Fy - Fxy.^2 - k*(Fx + Fy).^2;
 
 % eliminate weak features by using a global threshold
 H(H < tau) = 0;
 
-% maximum number of features
+% pre-define matrix for maximum number of features
 Merkmale = zeros(length(find(H ~= 0)), 2);
 num_features = 1;
-iterator = 1;
 
 % first entry of 'tile_size': width of tile
 % second entry of 'tile_size': height of tile
@@ -77,50 +73,55 @@ if (length(tile_size) == 1)
     tile_size = [tile_size, tile_size];
 end
 
-for tile_start_height = 1 : tile_size(2) : size(Image, 1)
-    for tile_start_width = 1: tile_size(1) : size(Image, 2)
+% move tile from upper left corner to lower right corner over the image
+% tile is moved first column then row wise
+for tile_start_col = 1: tile_size(1) : size(Image, 2)
+    for tile_start_row = 1 : tile_size(2) : size(Image, 1)
         % check each tile
         % only check part of tile that does not exceed picture ( -> tile_start_XXX : min(...) )
-        for height = tile_start_height : min(tile_start_height+tile_size(2), size(Image,1))
-            for width = tile_start_width : min(tile_start_width+tile_size(1)-1, size(Image,2))
+        for tile_col = tile_start_col : min(tile_start_col+tile_size(1)-1, size(Image,2))
+            for tile_row = tile_start_row : min(tile_start_row+tile_size(2)-1, size(Image,1))
                 % only consider pixels which might be a feature
-                if H(height,width) ~= 0
+                if ( H(tile_row,tile_col) ~= 0 )
                     % go through each row and column to check neighbors in
                     % minimal distance
-                    % make sure not to violate image dimension, i.e. 1 <= row <= size(Image,1)
-                    for row = max(1, tile_start_height - min_dist) : min(tile_start_height+min_dist, size(Image,1))
-                        if H(height, width) == 0
+                    % make sure not to violate image dimension, tile_start_row.e. 1 <= row <= size(Image,1)
+                    for col = max(1, tile_col - min_dist) : min(tile_col+min_dist, size(Image,2))
+                        if H(tile_row, tile_col) == 0
                             break
                         end
-                        for col = max(1, tile_start_width - min_dist) : min(tile_start_width+min_dist, size(Image,2))
-                            if (row == height && col == width) || H(row,col) == 0
+                        for row = max(1, tile_row - min_dist) : min(tile_row+min_dist, size(Image,1))
+                            if (row == tile_row && col == tile_col) || H(row,col) == 0
                                 continue
-                            elseif H(row,col) <= H(height, width)
+                            elseif H(row,col) <= H(tile_row, tile_col)
                                 % H(row, col) not as strong of a feature as
-                                % H(width, height) => discard
+                                % H(tile_row, tile_col) => discard
                                 H(row, col) = 0;
-                                break;
                             else
-                                % H(width, height) not as strong of a feature as
+                                % H(tile_row, tile_col) not as strong of a feature as
                                 % H(row, col) => discard 
-                                H(height, width) = 0;
+                                H(tile_row, tile_col) = 0;
+                                break;
                             end
                         end
-                    end       
+                    end
                 end
             end
         end
-        % find x and y coordinates of determined features
-        [row, col, val] = find(H(tile_start_height : min(tile_start_height+tile_size(2), size(Image,1)),tile_start_width : min(tile_start_width+tile_size(1)-1, size(Image,2))));
-        data = [row, col, val];
-        % sort data in descending order
-        data = sortrows(data, -3);
-        data(:,1) = tile_start_height+data(:,1)-1;
-        data(:,2) = tile_start_width+data(:,2)-1;
-        
-        if ( size(data,1) > 0)
-            data = data( min(N, size(data,1)), :);
-        
+
+         % find x and y coordinates of determined/found features in tile
+         [y, x, val] = find(H(tile_start_row : min(tile_start_row+tile_size(2)-1, size(Image,1)),tile_start_col : min(tile_start_col+tile_size(1)-1, size(Image,2))));
+         data = [x, y, val];
+         % sort data in descending order
+         data = sortrows(data, -3);
+         % find position of pixels, i.e. x and y coordinates, in the entire Image
+         data(:,1) = tile_start_col+data(:,1)-1;
+         data(:,2) = tile_start_row+data(:,2)-1;
+         
+        if ( ~isempty(data) )
+            % select max. top N pixel, i.e. most distincitive features
+            data = data( 1:min(N, size(data,1)), :);
+            % save features
             Merkmale(num_features:num_features+min(N, size(data,1))-1,:) = data(:,1:2);
             num_features = num_features+min(N, size(data,1));
         end
@@ -130,9 +131,15 @@ end
 
 % erase dispensable entries
 Merkmale(Merkmale == 0) = [];
+% shape Merkmale back in matrix form
+Merkmale = reshape(Merkmale, [], 2);
 
+% plot Image with features if flag do_plot is set
 if do_plot
-    figure, imagesc(Image), colormap(gray), hold on
+    figure
+    imagesc(Image)
+    colormap(gray)
+    hold on
     plot(Merkmale(:,1),Merkmale(:,2),'rs');
 end
 
